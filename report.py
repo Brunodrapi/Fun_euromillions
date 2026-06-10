@@ -13,6 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 API   = "https://euromillions.api.pedromealha.dev/v1/draws"
+COST_PER_GRID = 2.50
 CSV_F = Path(__file__).parent / "euromillions_history.csv"
 
 PRIZE_LABELS = {
@@ -254,16 +255,27 @@ def build_html(draw_date, db, ds, rows, g_top10, g_all):
     ds_str = " - ".join(str(n) for n in sorted(ds))
     winners = [r for r in rows if r["gain"] > 0]
     all_rows = "\n".join(combo_row(r) for r in rows)
+    n_top10   = min(10, len(rows))
+    cost_top10 = n_top10 * COST_PER_GRID
+    cost_all   = len(rows) * COST_PER_GRID
+    net_top10  = g_top10 - cost_top10
+    net_all    = g_all - cost_all
+    col_t10 = "#22c55e" if net_top10 >= 0 else "#ef4444"
+    col_all = "#22c55e" if net_all >= 0 else "#ef4444"
     return f"""<html><body style="font-family:sans-serif;background:#1a1a2e;color:#fff;padding:24px">
 <h1 style="color:#ffd200">Rapport EuroMillions - {draw_date}</h1>
 <p>Tirage : {db_str} | Etoiles : {ds_str}</p>
-<p style="color:#888;font-size:12px">Modèle : retard enrichi (fenêtre 100 tirages, std dev, fréquence récente) + contraintes de forme (somme 95-160, 2-3 pairs/impairs, 3+ dizaines)</p>
+<p style="color:#888;font-size:12px">Modèle : retard enrichi (fenêtre 100 tirages, std dev, fréquence récente) + contraintes de forme (somme 95-160, 2-3 pairs/impairs, 3+ dizaines) · Coût par grille : {COST_PER_GRID:.2f} EUR</p>
 <h2 style="color:#ffd200;margin-top:20px">Resume</h2>
 <table>
-<tr><td style="padding:3px 16px 3px 0">Gagnantes sur 100 combinaisons :</td><td><b>{len(winners)}</b></td></tr>
+<tr><td style="padding:3px 16px 3px 0">Gagnantes sur {len(rows)} combinaisons :</td><td><b>{len(winners)}</b></td></tr>
 <tr><td>Gagnantes sur les 10 premieres [P] :</td><td><b>{len([r for r in winners if r.get('exclusive')])}</b></td></tr>
-<tr><td>Gain cumule - 10 premieres :</td><td><b style="color:#22c55e">{g_top10:.2f} EUR</b></td></tr>
-<tr><td>Gain cumule - 100 combinaisons :</td><td><b style="color:#22c55e">{g_all:.2f} EUR</b></td></tr>
+<tr><td>Gain brut - 10 premieres :</td><td><b style="color:#22c55e">{g_top10:.2f} EUR</b></td></tr>
+<tr><td>Cout - 10 premieres ({n_top10} x {COST_PER_GRID:.2f}) :</td><td><b style="color:#ef4444">-{cost_top10:.2f} EUR</b></td></tr>
+<tr><td>Bilan net - 10 premieres :</td><td><b style="color:{col_t10}">{net_top10:+.2f} EUR</b></td></tr>
+<tr><td style="padding-top:8px">Gain brut - {len(rows)} combinaisons :</td><td style="padding-top:8px"><b style="color:#22c55e">{g_all:.2f} EUR</b></td></tr>
+<tr><td>Cout - {len(rows)} grilles ({len(rows)} x {COST_PER_GRID:.2f}) :</td><td><b style="color:#ef4444">-{cost_all:.2f} EUR</b></td></tr>
+<tr><td>Bilan net - {len(rows)} combinaisons :</td><td><b style="color:{col_all}">{net_all:+.2f} EUR</b></td></tr>
 </table>
 <h2 style="color:#ffd200;margin-top:20px">Detail</h2>
 <table style="font-size:13px;border-collapse:collapse">
@@ -317,6 +329,7 @@ if __name__ == "__main__":
     winners = [r for r in rows if r["gain"] > 0]
     print(f"  {len(winners)} gagnante(s) - top10={g_top10:.2f}EUR - total={g_all:.2f}EUR")
 
+    net_all = g_all - len(rows) * COST_PER_GRID
     html    = build_html(last_draw["date"], db, ds, rows, g_top10, g_all)
-    subject = f"EuroMillions {last_draw['date']} - {len(winners)} gagnante(s) - {g_all:.2f} EUR"
+    subject = f"EuroMillions {last_draw['date']} - {len(winners)} gagnante(s) - net {net_all:+.2f} EUR"
     send_email(subject, html)
