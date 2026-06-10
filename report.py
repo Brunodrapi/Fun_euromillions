@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 API   = "https://euromillions.api.pedromealha.dev/v1/draws"
-CSV_F = Path(__file__).parent / "euromillions_history.csv"
+CSV_F = Path(__file__).parent.parent / "euromillions_history.csv"
 
 PRIZE_LABELS = {
     (5,2):"Jackpot",(5,1):"Rang 2",(5,0):"Rang 3",
