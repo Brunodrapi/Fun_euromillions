@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EuroMillions Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: #fff;
+      padding: 2rem 1rem;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2.2rem;
+      margin-bottom: 0.4rem;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      text-align: center;
+      color: #aaa;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: block;
+      margin: 0 auto 2rem;
+      padding: 0.9rem 2.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(247, 151, 30, 0.4);
+    }
+    .btn:hover { transform: scale(1.05); }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-update {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-update:hover { background: rgba(255,255,255,0.15); }
+    .btn-update:disabled { opacity: 0.5; cursor: not-allowed; }
+    #status {
+      text-align: center;
+      color: #aaa;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+      min-height: 1.2em;
+    }
+    #combos {
+      max-width: 700px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .combo-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .combo-num { font-size: 1.1rem; font-weight: 700; color: #ffd200; min-width: 32px; }
+    .balls-group { display: flex; flex-wrap: wrap; gap: 0.5rem; flex: 1; }
+    .ball {
+      width: 42px; height: 42px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.95rem;
+    }
+    .ball.pair1 { background: linear-gradient(135deg, #1e90ff, #0056b3); box-shadow: 0 2px 8px rgba(30,144,255,0.5); }
+    .ball.pair2 { background: linear-gradient(135deg, #00c853, #007a2f); box-shadow: 0 2px 8px rgba(0,200,83,0.5); }
+    .ball.rand  { background: linear-gradient(135deg, #9c27b0, #5b0073); box-shadow: 0 2px 8px rgba(156,39,176,0.5); }
+    .star {
+      width: 42px; height: 42px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.95rem;
+      background: linear-gradient(135deg, #f7971e, #ffd200);
+      color: #1a1a2e; box-shadow: 0 2px 8px rgba(247,151,30,0.5);
+    }
+    .separator { color: rgba(255,255,255,0.2); font-size: 1.4rem; }
+    .legend {
+      max-width: 700px; margin: 2rem auto 0;
+      display: flex; flex-wrap: wrap; gap: 1rem;
+      justify-content: center; font-size: 0.8rem; color: #bbb;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+    .legend-dot { width: 14px; height: 14px; border-radius: 50%; }
+    .legend-dot.pair1 { background: #1e90ff; }
+    .legend-dot.pair2 { background: #00c853; }
+    .legend-dot.rand  { background: #9c27b0; }
+    .legend-dot.star  { background: #ffd200; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>⭐ EuroMillions Generator</h1>
+  <p class="subtitle">Numéros les plus attendus (retard / écart moyen) · historique 2004–2026 · jamais tirées</p>
+
+  <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:2rem">
+    <button class="btn" id="genBtn" onclick="generate()" disabled style="margin:0">Chargement…</button>
+  </div>
+  <div id="status"></div>
+  <div id="update-bar" style="text-align:center;margin-bottom:1.5rem;display:none">
+    <button class="btn-update" id="updateBtn" onclick="updateHistory()">🔄 Mettre à jour (tirages récents)</button>
+    <span id="update-status" style="display:block;color:#aaa;font-size:0.8rem;margin-top:0.4rem"></span>
+  </div>
+  <div id="combos"></div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot pair1"></div> Paire A·B (même dizaine, écart 1 ou 2)</div>
+    <div class="legend-item"><div class="legend-dot pair2"></div> Paire C·D (même dizaine, écart 1 ou 2)</div>
+    <div class="legend-item"><div class="legend-dot rand"></div> Numéro aléatoire E</div>
+    <div class="legend-item"><div class="legend-dot star"></div> Étoiles</div>
+  </div>
+
+  <script>
+    let history = new Set();
+    let allDraws = [];
+
+    // ── Chargement CSV ───────────────────────────────────────────
+    async function loadHistory() {
+      const res = await fetch('euromillions_history.csv');
+      if (!res.ok) throw new Error(`CSV introuvable (${res.status})`);
+      const text = await res.text();
+      const lines = text.trim().replace(/\r/g, '').split('\n');
+      const header = lines[0].split(';');
+      const b = ['boule_1','boule_2','boule_3','boule_4','boule_5'].map(c => header.indexOf(c));
+      const s = ['etoile_1','etoile_2'].map(c => header.indexOf(c));
+      if (b.includes(-1) || s.includes(-1)) throw new Error('Format CSV inattendu');
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cols = lines[i].split(';');
+        const balls = b.map(j => parseInt(cols[j])).sort((a,z) => a-z);
+        const stars = s.map(j => parseInt(cols[j])).sort((a,z) => a-z);
+        if (balls.some(isNaN) || stars.some(isNaN)) continue;
+        history.add(balls.join(',') + '|' + stars.join(','));
+        allDraws.push({ balls, stars });
+      }
+      computeWeights(allDraws);
+      return history.size;
+    }
+
+    // ── Mise à jour API ──────────────────────────────────────────
+    const API = 'https://euromillions.api.pedromealha.dev/v1/draws';
+
+    function addApiDraw(draw) {
+      const balls = draw.numbers.map(Number).sort((a,b) => a-b);
+      const stars = draw.stars.map(Number).sort((a,b) => a-b);
+      const key = balls.join(',') + '|' + stars.join(',');
+      if (!history.has(key)) {
+        history.add(key);
+        allDraws.push({ balls, stars });
+        return true;
+      }
+      return false;
+    }
+
+    async function updateHistory() {
+      const btn = document.getElementById('updateBtn');
+      const upStatus = document.getElementById('update-status');
+      btn.disabled = true;
+      upStatus.textContent = 'Récupération des tirages récents…';
+      const currentYear = new Date().getFullYear();
+      let added = 0;
+      for (const year of [currentYear - 1, currentYear]) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            const res = await fetch(`${API}?year=${year}`);
+            if (res.status === 429) { await new Promise(r => setTimeout(r, 2000 * (attempt+1))); continue; }
+            if (!res.ok) break;
+            const draws = await res.json();
+            draws.forEach(d => { if (addApiDraw(d)) added++; });
+            break;
+          } catch {}
+        }
+        await new Promise(r => setTimeout(r, 600));
+      }
+      if (added > 0) {
+        computeWeights(allDraws);
+        upStatus.textContent = `✅ ${added} nouveaux tirages ajoutés — ${history.size} au total`;
+      } else {
+        upStatus.textContent = `✅ Déjà à jour — ${history.size} tirages`;
+      }
+      btn.disabled = false;
+    }
+
+    // ── Poids retard ─────────────────────────────────────────────
+    let BALL_WEIGHT = {}, STAR_WEIGHT = {};
+
+    function computeWeights(draws) {
+      const total = draws.length;
+      function calc(maxN, getter) {
+        const w = {};
+        for (let n = 1; n <= maxN; n++) {
+          const app = draws.reduce((acc,d,i) => { if (getter(d).includes(n)) acc.push(i); return acc; }, []);
+          if (app.length < 2) { w[n] = 1; continue; }
+          const avgGap = (app[app.length-1] - app[0]) / (app.length - 1);
+          const ago = total - 1 - app[app.length-1];
+          w[n] = Math.max(1, ago / Math.max(1, avgGap));
+        }
+        return w;
+      }
+      BALL_WEIGHT = calc(50, d => d.balls);
+      STAR_WEIGHT = calc(12, d => d.stars);
+    }
+
+    function weightedPick(pool, wmap) {
+      const weights = pool.map(n => wmap[n] || 1);
+      const total = weights.reduce((s,w) => s+w, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) return pool[i]; }
+      return pool[pool.length-1];
+    }
+
+    // ── Génération ───────────────────────────────────────────────
+    function decade(n) { return n <= 9 ? 0 : Math.floor((n-1)/10); }
+
+    function makePair(excludeDecades, excludeBalls = new Set()) {
+      for (let t = 0; t < 1000; t++) {
+        const a = weightedPick(Object.keys(BALL_WEIGHT).map(Number), BALL_WEIGHT);
+        if (excludeBalls.has(a)) continue;
+        const diff = Math.random() < 0.5 ? 1 : 2;
+        const b = Math.random() < 0.5 ? a + diff : a - diff;
+        if (b < 1 || b > 50 || excludeBalls.has(b)) continue;
+        if (decade(a) !== decade(b)) continue;
+        const d = decade(a);
+        if (excludeDecades.has(d)) continue;
+        return { pair: [a,b].sort((x,y)=>x-y), dec: d };
+      }
+      return null;
+    }
+
+    function makeCombo(excludeBalls = new Set()) {
+      for (let t = 0; t < 10000; t++) {
+        const ab = makePair(new Set(), excludeBalls);
+        if (!ab) continue;
+        const cd = makePair(new Set([ab.dec]), excludeBalls);
+        if (!cd) continue;
+        const used = new Set([...ab.pair, ...cd.pair]);
+        const pool = [];
+        for (let n = 1; n <= 50; n++) if (!used.has(n) && !excludeBalls.has(n)) pool.push(n);
+        if (!pool.length) continue;
+        const e = weightedPick(pool, BALL_WEIGHT);
+        const balls = [...ab.pair, ...cd.pair, e].sort((a,b) => a-b);
+        if (new Set(balls).size !== 5) continue;
+        const sp = [1,2,3,4,5,6,7,8,9,10,11,12];
+        const f = weightedPick(sp, STAR_WEIGHT);
+        const g = weightedPick(sp.filter(s => s!==f), STAR_WEIGHT);
+        const stars = [f,g].sort((a,b) => a-b);
+        const key = balls.join(',') + '|' + stars.join(',');
+        if (!history.has(key)) return { balls, stars, pair1: ab.pair, pair2: cd.pair };
+      }
+      return null;
+    }
+
+    // ── UI ───────────────────────────────────────────────────────
+    function generate() {
+      const btn = document.getElementById('genBtn');
+      const status = document.getElementById('status');
+      const container = document.getElementById('combos');
+      btn.disabled = true;
+      container.innerHTML = '';
+      const combos = [];
+      const usedBalls = new Set();
+      for (let i = 0; i < 10; i++) {
+        const c = makeCombo(usedBalls);
+        if (c) { combos.push({...c, exclusive:true}); c.balls.forEach(n => usedBalls.add(n)); }
+      }
+      for (let i = 0; i < 90; i++) {
+        const c = makeCombo();
+        if (c) combos.push({...c, exclusive:false});
+      }
+      status.textContent = `${combos.length} combinaisons générées — ${history.size} tirages analysés`;
+      const sec1 = document.createElement('div');
+      sec1.innerHTML = '<p style="color:#ffd200;font-weight:700;font-size:1rem;margin:0.5rem 0">⭐ Sélection Premium — 10 combinaisons sans numéro commun</p>';
+      container.appendChild(sec1);
+      combos.forEach((combo, i) => {
+        if (i === 10) {
+          const sec2 = document.createElement('div');
+          sec2.innerHTML = '<p style="color:#aaa;font-weight:600;font-size:0.9rem;margin:1.5rem 0 0.5rem">── 90 combinaisons supplémentaires ──</p>';
+          container.appendChild(sec2);
+        }
+        const card = document.createElement('div');
+        card.className = 'combo-card';
+        card.style.animationDelay = `${Math.min(i,20)*0.05}s`;
+        if (combo.exclusive) card.style.borderColor = 'rgba(255,210,0,0.3)';
+        const ballsHtml = combo.balls.map(n => {
+          let cls = 'rand';
+          if (combo.pair1.includes(n)) cls = 'pair1';
+          else if (combo.pair2.includes(n)) cls = 'pair2';
+          return `<div class="ball ${cls}">${n}</div>`;
+        }).join('');
+        const starsHtml = combo.stars.map(s => `<div class="star">★${s}</div>`).join('');
+        card.innerHTML = `
+          <div class="combo-num">${combo.exclusive ? '★' : '#'}${i+1}</div>
+          <div class="balls-group">${ballsHtml}</div>
+          <div class="separator">|</div>
+          <div class="balls-group">${starsHtml}</div>`;
+        container.appendChild(card);
+      });
+      btn.disabled = false;
+    }
+
+    // ── Init ─────────────────────────────────────────────────────
+    const btn = document.getElementById('genBtn');
+    const status = document.getElementById('status');
+    status.textContent = 'Chargement de l\'historique…';
+    loadHistory().then(async n => {
+      status.textContent = `${n} tirages chargés — mise à jour…`;
+      btn.textContent = '🎲 Générer 100 combinaisons';
+      btn.disabled = false;
+      document.getElementById('update-bar').style.display = 'block';
+      await updateHistory();
+      status.textContent = `${history.size} tirages chargés — prêt !`;
+      generate();
+    }).catch(err => {
+      status.textContent = 'Erreur : ' + err.message;
+      btn.textContent = 'Erreur';
+    });
+  </script>
+</body>
+</html>

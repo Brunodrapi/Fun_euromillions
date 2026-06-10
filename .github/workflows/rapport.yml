@@ -1,0 +1,24 @@
+name: Rapport EuroMillions
+
+on:
+  schedule:
+    - cron: '0 22 * * 3'   # Mercredi 22h UTC (après tirage du mardi soir)
+    - cron: '0 22 * * 6'   # Samedi 22h UTC (après tirage du vendredi soir)
+  workflow_dispatch:        # Déclenchement manuel possible
+
+jobs:
+  rapport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate & report
+        env:
+          MAIL_TO:        ${{ secrets.MAIL_TO }}
+          MAIL_FROM:      ${{ secrets.MAIL_FROM }}
+          BREVO_API_KEY:  ${{ secrets.BREVO_API_KEY }}
+        run: python report.py
