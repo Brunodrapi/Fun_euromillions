@@ -2,9 +2,9 @@ name: Rapport EuroMillions
 
 on:
   schedule:
-    - cron: '0 22 * * 3'   # Mercredi 22h UTC (après tirage du mardi soir)
-    - cron: '0 22 * * 6'   # Samedi 22h UTC (après tirage du vendredi soir)
-  workflow_dispatch:        # Déclenchement manuel possible
+    - cron: '0 22 * * 3'   # Mercredi 22h UTC (apres tirage du mardi soir)
+    - cron: '0 22 * * 6'   # Samedi 22h UTC (apres tirage du vendredi soir)
+  workflow_dispatch:        # Declenchement manuel possible
 
 jobs:
   rapport:
@@ -18,7 +18,9 @@ jobs:
 
       - name: Generate & report
         env:
-          MAIL_TO:        ${{ secrets.MAIL_TO }}
-          MAIL_FROM:      ${{ secrets.MAIL_FROM }}
-          BREVO_API_KEY:  ${{ secrets.BREVO_API_KEY }}
+          MAIL_TO:       ${{ secrets.MAIL_TO }}
+          MAIL_FROM:     ${{ secrets.MAIL_FROM }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_SMTP:     ${{ secrets.MAIL_SMTP }}
+          MAIL_PORT:     ${{ secrets.MAIL_PORT }}
         run: python report.py
