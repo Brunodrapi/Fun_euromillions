@@ -2,18 +2,18 @@
 Rapport EuroMillions — exécuté chaque mercredi et samedi par GitHub Actions.
 1. Charge l'historique (CSV + API pour les tirages récents)
 2. Retire le dernier tirage pour ne pas biaiser les poids
-3. Génère 100 combinaisons basées sur les tendances actuelles
+3. Génère 100 combinaisons (modèle retard enrichi + contraintes de forme)
 4. Vérifie les gains contre le dernier tirage
 5. Envoie un email récapitulatif via Gmail SMTP
 """
-import json, csv, random, time, os, smtplib, urllib.request
+import json, csv, random, time, os, math, smtplib, urllib.request
 from pathlib import Path
 from datetime import date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 API   = "https://euromillions.api.pedromealha.dev/v1/draws"
-CSV_F = Path(__file__).parent.parent / "euromillions_history.csv"
+CSV_F = Path(__file__).parent / "euromillions_history.csv"
 
 PRIZE_LABELS = {
     (5,2):"Jackpot",(5,1):"Rang 2",(5,0):"Rang 3",
@@ -67,20 +67,49 @@ def fetch_last_draw():
             return max(draws, key=lambda d: d["date"])
     raise RuntimeError("Impossible de récupérer le dernier tirage")
 
-# ── Poids retard ─────────────────────────────────────────────────────────────
+# ── Poids retard enrichi (#3) ────────────────────────────────────────────────
+# Fenêtre glissante 100 draws + std dev des écarts + fréquence récente
 
 def compute_weights(draws):
     total = len(draws)
+    window_size = min(100, total)
+    recent = draws[-window_size:]
+
     def w_for(max_n, getter):
         w = {}
         for n in range(1, max_n + 1):
-            pos = [i for i,d in enumerate(draws) if n in getter(d)]
-            if len(pos) < 2: w[n] = 1.0; continue
-            avg_gap    = (pos[-1] - pos[0]) / (len(pos) - 1)
-            since_last = total - 1 - pos[-1]
-            w[n] = max(1.0, since_last / max(1.0, avg_gap))
+            positions = [i for i, d in enumerate(draws) if n in getter(d)]
+            if not positions:
+                w[n] = 1.0
+                continue
+            ago = total - 1 - positions[-1]
+            if len(positions) == 1:
+                w[n] = max(1.0, float(ago))
+                continue
+            gaps = [positions[i] - positions[i-1] for i in range(1, len(positions))]
+            avg_gap = sum(gaps) / len(gaps)
+            variance = sum((g - avg_gap)**2 for g in gaps) / len(gaps)
+            std_bonus = 1.0 + math.sqrt(variance) / max(1.0, avg_gap) * 0.3
+            recent_count = sum(1 for d in recent if n in getter(d))
+            expected = window_size / max(1.0, avg_gap)
+            freq_factor = max(0.5, 1.5 - recent_count / max(0.5, expected))
+            retard = ago / max(1.0, avg_gap)
+            w[n] = max(1.0, retard * std_bonus * freq_factor)
         return w
-    return w_for(50, lambda d: d["balls"]), w_for(12, lambda d: d["stars"])
+
+    bw = w_for(50, lambda d: d["balls"])
+    sw = w_for(12, lambda d: d["stars"])
+
+    # Pair co-occurrence bonus
+    pair_bonus = {}
+    for d in draws:
+        balls = d["balls"]
+        for i in range(len(balls)):
+            for j in range(i+1, len(balls)):
+                key = (balls[i], balls[j])
+                pair_bonus[key] = pair_bonus.get(key, 0) + 1
+
+    return bw, sw, pair_bonus
 
 def wpick(pool, wmap):
     weights = [wmap.get(n, 1.0) for n in pool]
@@ -90,38 +119,77 @@ def wpick(pool, wmap):
         if r <= 0: return n
     return pool[-1]
 
-# ── Génération ───────────────────────────────────────────────────────────────
+# ── Contraintes de forme (#4) ────────────────────────────────────────────────
 
 def decade(n): return 0 if n <= 9 else (n - 1) // 10
 
-def make_pair(bw, excl_decades, excl_balls):
+def is_valid_shape(balls):
+    s = sum(balls)
+    if s < 95 or s > 160:
+        return False
+    evens = sum(1 for n in balls if n % 2 == 0)
+    if evens < 2 or evens > 3:
+        return False
+    decades = len({decade(n) for n in balls})
+    if decades < 3:
+        return False
+    return True
+
+# ── Génération ───────────────────────────────────────────────────────────────
+
+def make_pair(bw, pair_bonus, excl_decades, excl_balls):
     for _ in range(2000):
         a = wpick(list(range(1, 51)), bw)
-        if a in excl_balls: continue
-        diff = random.choice([1, 2])
-        b = a + diff if random.random() < 0.5 else a - diff
-        if b < 1 or b > 50 or b in excl_balls: continue
-        if decade(a) != decade(b): continue
+        if a in excl_balls:
+            continue
+        # Build valid b candidates with pair bias
+        candidates = []
+        for diff in [1, 2]:
+            for b in [a + diff, a - diff]:
+                if 1 <= b <= 50 and b not in excl_balls and decade(a) == decade(b):
+                    candidates.append(b)
+        if not candidates:
+            continue
         d = decade(a)
-        if d in excl_decades: continue
-        return sorted([a, b]), d
+        if d in excl_decades:
+            continue
+        # Weighted pick of b using pair co-occurrence
+        b_weights = []
+        for b in candidates:
+            key = (min(a, b), max(a, b))
+            b_weights.append(max(1.0, bw.get(b, 1.0)) * (1 + pair_bonus.get(key, 0) * 0.05))
+        r = random.random() * sum(b_weights)
+        chosen = candidates[-1]
+        for b, bw_val in zip(candidates, b_weights):
+            r -= bw_val
+            if r <= 0:
+                chosen = b
+                break
+        return sorted([a, chosen]), d
     return None, None
 
-def make_combo(bw, sw, hist_set, excl_balls=None):
-    excl = excl_balls or set()
+def make_combo(bw, sw, pair_bonus, hist_set, excl_balls=None):
+    excl = set(excl_balls) if excl_balls else set()
     for _ in range(10000):
-        ab, dec_ab = make_pair(bw, set(), excl)
-        if ab is None: continue
-        cd, _      = make_pair(bw, {dec_ab}, excl | set(ab))
-        if cd is None: continue
-        pool_e = [n for n in range(1,51) if n not in excl and n not in set(ab+cd)]
-        if not pool_e: continue
+        ab, dec_ab = make_pair(bw, pair_bonus, set(), excl)
+        if ab is None:
+            continue
+        cd, _ = make_pair(bw, pair_bonus, {dec_ab}, excl | set(ab))
+        if cd is None:
+            continue
+        pool_e = [n for n in range(1, 51) if n not in excl and n not in set(ab + cd)]
+        if not pool_e:
+            continue
         e = wpick(pool_e, bw)
         balls = tuple(sorted(ab + cd + [e]))
-        if len(set(balls)) != 5: continue
+        if len(set(balls)) != 5:
+            continue
+        # Shape constraints (#4)
+        if not is_valid_shape(list(balls)):
+            continue
         sp = list(range(1, 13))
-        f  = wpick(sp, sw)
-        g  = wpick([s for s in sp if s != f], sw)
+        f = wpick(sp, sw)
+        g = wpick([s for s in sp if s != f], sw)
         stars = tuple(sorted([f, g]))
         if balls + stars not in hist_set:
             return {"balls": list(balls), "stars": list(stars), "pair1": ab, "pair2": cd}
@@ -129,16 +197,16 @@ def make_combo(bw, sw, hist_set, excl_balls=None):
 
 def generate_100(draws):
     hist_set = {tuple(d["balls"] + d["stars"]) for d in draws}
-    bw, sw   = compute_weights(draws)
-    combos   = []
+    bw, sw, pair_bonus = compute_weights(draws)
+    combos = []
     used = set()
     for i in range(10):
-        c = make_combo(bw, sw, hist_set, excl_balls=used)
+        c = make_combo(bw, sw, pair_bonus, hist_set, excl_balls=used)
         if c:
             combos.append({**c, "exclusive": True})
             used.update(c["balls"])
     for _ in range(90):
-        c = make_combo(bw, sw, hist_set)
+        c = make_combo(bw, sw, pair_bonus, hist_set)
         if c:
             combos.append({**c, "exclusive": False})
     print(f"  {len(combos)} combinaisons générées")
@@ -189,6 +257,7 @@ def build_html(draw_date, db, ds, rows, g_top10, g_all):
     return f"""<html><body style="font-family:sans-serif;background:#1a1a2e;color:#fff;padding:24px">
 <h1 style="color:#ffd200">Rapport EuroMillions - {draw_date}</h1>
 <p>Tirage : {db_str} | Etoiles : {ds_str}</p>
+<p style="color:#888;font-size:12px">Modèle : retard enrichi (fenêtre 100 tirages, std dev, fréquence récente) + contraintes de forme (somme 95-160, 2-3 pairs/impairs, 3+ dizaines)</p>
 <h2 style="color:#ffd200;margin-top:20px">Resume</h2>
 <table>
 <tr><td style="padding:3px 16px 3px 0">Gagnantes sur 100 combinaisons :</td><td><b>{len(winners)}</b></td></tr>
@@ -202,7 +271,7 @@ def build_html(draw_date, db, ds, rows, g_top10, g_all):
 <th style="padding:3px 8px">#</th><th>Combinaison</th><th>Match</th><th>Rang</th><th>Gain</th>
 </tr></thead><tbody>{all_rows}</tbody></table>
 <p style="color:#6b7280;font-size:11px;margin-top:20px">
-[P] = selection premium (10 sans numero commun) - genere automatiquement selon retard historique
+[P] = selection premium (10 sans numero commun) - genere automatiquement selon retard historique enrichi
 </p></body></html>"""
 
 def send_email(subject, html):

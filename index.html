@@ -28,6 +28,30 @@
       font-size: 0.9rem;
       margin-bottom: 2rem;
     }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .tab {
+      padding: 0.5rem 1.5rem;
+      border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      color: #1a1a2e;
+      font-weight: 700;
+      border-color: transparent;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
     .btn {
       display: block;
       margin: 0 auto 2rem;
@@ -116,32 +140,156 @@
     .legend-dot.pair2 { background: #00c853; }
     .legend-dot.rand  { background: #9c27b0; }
     .legend-dot.star  { background: #ffd200; border-radius: 3px; }
+    /* Backtest styles */
+    #backtest-section { max-width: 800px; margin: 0 auto; }
+    .bt-summary {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .bt-summary h3 { color: #ffd200; margin-bottom: 1rem; }
+    .bt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .bt-stat {
+      text-align: center;
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .bt-stat .val { font-size: 1.6rem; font-weight: 700; color: #ffd200; }
+    .bt-stat .lbl { font-size: 0.75rem; color: #aaa; margin-top: 0.3rem; }
+    .bt-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 1rem;
+    }
+    .bt-table th {
+      color: #ffd200;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .bt-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      color: #ddd;
+    }
+    .bt-table tr.win td { color: #22c55e; }
+    .model-compare {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .model-card {
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .model-card h4 { color: #ffd200; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .model-card .score { font-size: 1.4rem; font-weight: 700; }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      margin: 0.5rem 0;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
   </style>
 </head>
 <body>
   <h1>⭐ EuroMillions Generator</h1>
-  <p class="subtitle">Numéros les plus attendus (retard / écart moyen) · historique 2004–2026 · jamais tirées</p>
+  <p class="subtitle">Modèle enrichi : retard · fenêtre glissante · contraintes statistiques · historique 2004–2026</p>
 
-  <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:2rem">
-    <button class="btn" id="genBtn" onclick="generate()" disabled style="margin:0">Chargement…</button>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('generate')">🎲 Générer</button>
+    <button class="tab" onclick="showTab('backtest')">📊 Backtest</button>
   </div>
-  <div id="status"></div>
-  <div id="update-bar" style="text-align:center;margin-bottom:1.5rem;display:none">
-    <button class="btn-update" id="updateBtn" onclick="updateHistory()">🔄 Mettre à jour (tirages récents)</button>
-    <span id="update-status" style="display:block;color:#aaa;font-size:0.8rem;margin-top:0.4rem"></span>
-  </div>
-  <div id="combos"></div>
 
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot pair1"></div> Paire A·B (même dizaine, écart 1 ou 2)</div>
-    <div class="legend-item"><div class="legend-dot pair2"></div> Paire C·D (même dizaine, écart 1 ou 2)</div>
-    <div class="legend-item"><div class="legend-dot rand"></div> Numéro aléatoire E</div>
-    <div class="legend-item"><div class="legend-dot star"></div> Étoiles</div>
+  <!-- TAB GÉNÉRER -->
+  <div id="tab-generate" class="tab-content active">
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:2rem">
+      <button class="btn" id="genBtn" onclick="generate()" disabled style="margin:0">Chargement…</button>
+    </div>
+    <div id="status"></div>
+    <div id="update-bar" style="text-align:center;margin-bottom:1.5rem;display:none">
+      <button class="btn-update" id="updateBtn" onclick="updateHistory()">🔄 Mettre à jour (tirages récents)</button>
+      <span id="update-status" style="display:block;color:#aaa;font-size:0.8rem;margin-top:0.4rem"></span>
+    </div>
+    <div id="combos"></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot pair1"></div> Paire A·B (même dizaine, écart 1-2)</div>
+      <div class="legend-item"><div class="legend-dot pair2"></div> Paire C·D (même dizaine, écart 1-2)</div>
+      <div class="legend-item"><div class="legend-dot rand"></div> Numéro aléatoire E</div>
+      <div class="legend-item"><div class="legend-dot star"></div> Étoiles</div>
+    </div>
+  </div>
+
+  <!-- TAB BACKTEST -->
+  <div id="tab-backtest" class="tab-content">
+    <div id="backtest-section">
+      <div class="bt-summary">
+        <h3>Backtest — simulation sur les derniers tirages</h3>
+        <p style="color:#aaa;font-size:0.85rem;margin-bottom:1rem">
+          Simule la stratégie sur les 100 derniers tirages : génère 20 combinaisons par tirage (en excluant ce tirage de l'historique),
+          puis vérifie combien auraient été gagnantes. Compare le modèle retard enrichi vs aléatoire vs fréquence.
+        </p>
+        <button class="btn" id="btBtn" onclick="runBacktest()" style="margin:0 auto 0" disabled>
+          Chargement…
+        </button>
+        <div id="bt-progress" style="display:none;margin-top:1rem">
+          <div style="color:#aaa;font-size:0.85rem;margin-bottom:0.4rem" id="bt-progress-text">0 / 100</div>
+          <div class="progress-bar"><div class="progress-fill" id="bt-progress-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div id="bt-results" style="display:none">
+        <div class="bt-summary">
+          <h3>Résultats globaux</h3>
+          <div class="bt-grid" id="bt-stats"></div>
+          <h3 style="margin-top:1.5rem">Comparaison des modèles (20 combos × 100 tirages)</h3>
+          <div class="model-compare" id="bt-models"></div>
+        </div>
+        <div class="bt-summary">
+          <h3>Détail par tirage (100 derniers)</h3>
+          <table class="bt-table">
+            <thead><tr>
+              <th>#</th><th>Tirage (boules)</th><th>Étoiles</th>
+              <th>Meilleur match</th><th>Combos gagnantes</th>
+            </tr></thead>
+            <tbody id="bt-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     let history = new Set();
     let allDraws = [];
+    let BALL_WEIGHT = {}, STAR_WEIGHT = {}, PAIR_BONUS = {};
+
+    // ── Tabs ─────────────────────────────────────────────────────
+    function showTab(name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.querySelectorAll('.tab')[name === 'generate' ? 0 : 1].classList.add('active');
+    }
 
     // ── Chargement CSV ───────────────────────────────────────────
     async function loadHistory() {
@@ -210,24 +358,63 @@
       btn.disabled = false;
     }
 
-    // ── Poids retard ─────────────────────────────────────────────
-    let BALL_WEIGHT = {}, STAR_WEIGHT = {};
+    // ── Poids retard enrichi (#3) ────────────────────────────────
+    // Fenêtre glissante 100 derniers tirages + std dev des écarts + fréquence récente
 
     function computeWeights(draws) {
       const total = draws.length;
+      const windowSize = Math.min(100, total);
+      const recent = draws.slice(-windowSize);
+
       function calc(maxN, getter) {
         const w = {};
         for (let n = 1; n <= maxN; n++) {
-          const app = draws.reduce((acc,d,i) => { if (getter(d).includes(n)) acc.push(i); return acc; }, []);
-          if (app.length < 2) { w[n] = 1; continue; }
-          const avgGap = (app[app.length-1] - app[0]) / (app.length - 1);
-          const ago = total - 1 - app[app.length-1];
-          w[n] = Math.max(1, ago / Math.max(1, avgGap));
+          const positions = [];
+          draws.forEach((d, i) => { if (getter(d).includes(n)) positions.push(i); });
+
+          if (positions.length === 0) { w[n] = 1; continue; }
+
+          // Retard (draws since last appearance)
+          const ago = total - 1 - positions[positions.length - 1];
+
+          if (positions.length === 1) { w[n] = Math.max(1, ago); continue; }
+
+          // Average gap over full history
+          const gaps = [];
+          for (let i = 1; i < positions.length; i++) gaps.push(positions[i] - positions[i-1]);
+          const avgGap = gaps.reduce((s,g) => s+g, 0) / gaps.length;
+
+          // Std dev of gaps: high std dev = irregular → slight boost when overdue
+          const variance = gaps.reduce((s,g) => s + (g - avgGap)**2, 0) / gaps.length;
+          const stdBonus = 1 + Math.sqrt(variance) / Math.max(1, avgGap) * 0.3;
+
+          // Recent frequency in sliding window vs expected
+          const recentCount = recent.reduce((acc, d) => getter(d).includes(n) ? acc + 1 : acc, 0);
+          const expectedInWindow = windowSize / Math.max(1, avgGap);
+          const freqRatio = recentCount / Math.max(0.5, expectedInWindow);
+          // Penalize recently over-represented numbers (freqRatio > 1), boost underrepresented
+          const freqFactor = Math.max(0.5, 1.5 - freqRatio);
+
+          const retard = ago / Math.max(1, avgGap);
+          w[n] = Math.max(1, retard * stdBonus * freqFactor);
         }
         return w;
       }
+
       BALL_WEIGHT = calc(50, d => d.balls);
       STAR_WEIGHT = calc(12, d => d.stars);
+
+      // Pair co-occurrence map for pair bias
+      PAIR_BONUS = {};
+      for (const d of draws) {
+        const balls = d.balls;
+        for (let i = 0; i < balls.length; i++) {
+          for (let j = i + 1; j < balls.length; j++) {
+            const key = balls[i] + ',' + balls[j];
+            PAIR_BONUS[key] = (PAIR_BONUS[key] || 0) + 1;
+          }
+        }
+      }
     }
 
     function weightedPick(pool, wmap) {
@@ -238,6 +425,19 @@
       return pool[pool.length-1];
     }
 
+    // ── Contraintes de forme (#4) ────────────────────────────────
+    // Somme 95-160, 2-3 pairs/impairs, 3+ dizaines distinctes
+
+    function isValidShape(balls) {
+      const sum = balls.reduce((s,n) => s+n, 0);
+      if (sum < 95 || sum > 160) return false;
+      const evens = balls.filter(n => n % 2 === 0).length;
+      if (evens < 2 || evens > 3) return false;
+      const decades = new Set(balls.map(decade));
+      if (decades.size < 3) return false;
+      return true;
+    }
+
     // ── Génération ───────────────────────────────────────────────
     function decade(n) { return n <= 9 ? 0 : Math.floor((n-1)/10); }
 
@@ -245,18 +445,36 @@
       for (let t = 0; t < 1000; t++) {
         const a = weightedPick(Object.keys(BALL_WEIGHT).map(Number), BALL_WEIGHT);
         if (excludeBalls.has(a)) continue;
-        const diff = Math.random() < 0.5 ? 1 : 2;
-        const b = Math.random() < 0.5 ? a + diff : a - diff;
-        if (b < 1 || b > 50 || excludeBalls.has(b)) continue;
-        if (decade(a) !== decade(b)) continue;
+        // Build valid b candidates
+        const candidates = [];
+        for (const diff of [1, 2]) {
+          for (const b of [a + diff, a - diff]) {
+            if (b >= 1 && b <= 50 && !excludeBalls.has(b) && decade(a) === decade(b)) {
+              candidates.push(b);
+            }
+          }
+        }
+        if (!candidates.length) continue;
         const d = decade(a);
         if (excludeDecades.has(d)) continue;
-        return { pair: [a,b].sort((x,y)=>x-y), dec: d };
+        // Pick b biased by pair co-occurrence history (#3)
+        const bWeights = candidates.map(b => {
+          const key = Math.min(a,b) + ',' + Math.max(a,b);
+          return Math.max(1, BALL_WEIGHT[b] || 1) * (1 + (PAIR_BONUS[key] || 0) * 0.05);
+        });
+        const totalW = bWeights.reduce((s,w) => s+w, 0);
+        let r = Math.random() * totalW;
+        let chosen = candidates[candidates.length - 1];
+        for (let i = 0; i < candidates.length; i++) {
+          r -= bWeights[i];
+          if (r <= 0) { chosen = candidates[i]; break; }
+        }
+        return { pair: [a, chosen].sort((x,y) => x-y), dec: d };
       }
       return null;
     }
 
-    function makeCombo(excludeBalls = new Set()) {
+    function makeCombo(excludeBalls = new Set(), histSet = history) {
       for (let t = 0; t < 10000; t++) {
         const ab = makePair(new Set(), excludeBalls);
         if (!ab) continue;
@@ -269,17 +487,19 @@
         const e = weightedPick(pool, BALL_WEIGHT);
         const balls = [...ab.pair, ...cd.pair, e].sort((a,b) => a-b);
         if (new Set(balls).size !== 5) continue;
+        // Shape constraints (#4)
+        if (!isValidShape(balls)) continue;
         const sp = [1,2,3,4,5,6,7,8,9,10,11,12];
         const f = weightedPick(sp, STAR_WEIGHT);
         const g = weightedPick(sp.filter(s => s!==f), STAR_WEIGHT);
         const stars = [f,g].sort((a,b) => a-b);
         const key = balls.join(',') + '|' + stars.join(',');
-        if (!history.has(key)) return { balls, stars, pair1: ab.pair, pair2: cd.pair };
+        if (!histSet.has(key)) return { balls, stars, pair1: ab.pair, pair2: cd.pair };
       }
       return null;
     }
 
-    // ── UI ───────────────────────────────────────────────────────
+    // ── UI Générer ───────────────────────────────────────────────
     function generate() {
       const btn = document.getElementById('genBtn');
       const status = document.getElementById('status');
@@ -327,6 +547,217 @@
       btn.disabled = false;
     }
 
+    // ── Backtest (#5) ────────────────────────────────────────────
+    // Simule la stratégie sur les 100 derniers tirages
+    // Pour chaque tirage : calcule les poids sur l'historique précédent, génère 20 combos, vérifie gains
+
+    function checkMatch(combo, draw) {
+      const mb = combo.balls.filter(n => draw.balls.includes(n)).length;
+      const ms = combo.stars.filter(s => draw.stars.includes(s)).length;
+      return { mb, ms };
+    }
+
+    const PRIZE_LABELS = {
+      '5,2':'Jackpot','5,1':'Rang 2','5,0':'Rang 3',
+      '4,2':'Rang 4','4,1':'Rang 5','4,0':'Rang 6',
+      '3,2':'Rang 7','2,2':'Rang 8','3,1':'Rang 9',
+      '3,0':'Rang 10','1,2':'Rang 11','2,1':'Rang 12','2,0':'Rang 13'
+    };
+
+    function hasPrize(mb, ms) {
+      return PRIZE_LABELS[mb+','+ms] !== undefined;
+    }
+
+    // Générer combos avec un jeu de poids donné (pour comparaison de modèles)
+    function generateCombosWithWeights(bw, sw, pb, histSet, n) {
+      const savedBW = BALL_WEIGHT, savedSW = STAR_WEIGHT, savedPB = PAIR_BONUS;
+      BALL_WEIGHT = bw; STAR_WEIGHT = sw; PAIR_BONUS = pb;
+      const combos = [];
+      for (let i = 0; i < n; i++) {
+        const c = makeCombo(new Set(), histSet);
+        if (c) combos.push(c);
+      }
+      BALL_WEIGHT = savedBW; STAR_WEIGHT = savedSW; PAIR_BONUS = savedPB;
+      return combos;
+    }
+
+    function randomWeights(maxN) {
+      const w = {};
+      for (let n = 1; n <= maxN; n++) w[n] = 1;
+      return w;
+    }
+
+    function frequencyWeights(draws, maxN, getter) {
+      const w = {};
+      for (let n = 1; n <= maxN; n++) {
+        w[n] = Math.max(1, draws.reduce((acc, d) => getter(d).includes(n) ? acc+1 : acc, 0));
+      }
+      return w;
+    }
+
+    async function runBacktest() {
+      if (allDraws.length < 50) {
+        alert('Historique insuffisant pour le backtest');
+        return;
+      }
+      const btn = document.getElementById('btBtn');
+      const progDiv = document.getElementById('bt-progress');
+      const progText = document.getElementById('bt-progress-text');
+      const progFill = document.getElementById('bt-progress-fill');
+      btn.disabled = true;
+      progDiv.style.display = 'block';
+      document.getElementById('bt-results').style.display = 'none';
+
+      const testCount = Math.min(100, allDraws.length - 50);
+      const startIdx = allDraws.length - testCount;
+      const COMBOS_PER_DRAW = 20;
+
+      // Results for 3 models
+      const results = { retard: [], random: [], freq: [] };
+      const drawDetails = [];
+
+      for (let i = 0; i < testCount; i++) {
+        const drawIdx = startIdx + i;
+        const draw = allDraws[drawIdx];
+        const historical = allDraws.slice(0, drawIdx);
+
+        // Compute retard weights for this historical slice
+        const histSet = new Set(historical.map(d => d.balls.join(',') + '|' + d.stars.join(',')));
+
+        // -- Retard model (with enriched weights) --
+        const retardBW = {}, retardSW = {};
+        const total = historical.length;
+        const windowSize = Math.min(100, total);
+        const recent = historical.slice(-windowSize);
+        for (let n = 1; n <= 50; n++) {
+          const pos = historical.reduce((acc, d, idx) => { if (d.balls.includes(n)) acc.push(idx); return acc; }, []);
+          if (pos.length === 0) { retardBW[n] = 1; continue; }
+          const ago = total - 1 - pos[pos.length-1];
+          if (pos.length === 1) { retardBW[n] = Math.max(1, ago); continue; }
+          const gaps = []; for (let k=1;k<pos.length;k++) gaps.push(pos[k]-pos[k-1]);
+          const avgGap = gaps.reduce((s,g) => s+g, 0) / gaps.length;
+          const variance = gaps.reduce((s,g) => s+(g-avgGap)**2, 0) / gaps.length;
+          const stdBonus = 1 + Math.sqrt(variance) / Math.max(1, avgGap) * 0.3;
+          const recentCount = recent.reduce((acc, d) => d.balls.includes(n) ? acc+1 : acc, 0);
+          const freqFactor = Math.max(0.5, 1.5 - recentCount / Math.max(0.5, windowSize / Math.max(1, avgGap)));
+          retardBW[n] = Math.max(1, (ago / Math.max(1, avgGap)) * stdBonus * freqFactor);
+        }
+        for (let n = 1; n <= 12; n++) {
+          const pos = historical.reduce((acc, d, idx) => { if (d.stars.includes(n)) acc.push(idx); return acc; }, []);
+          if (pos.length === 0) { retardSW[n] = 1; continue; }
+          const ago = total - 1 - pos[pos.length-1];
+          if (pos.length === 1) { retardSW[n] = Math.max(1, ago); continue; }
+          const gaps = []; for (let k=1;k<pos.length;k++) gaps.push(pos[k]-pos[k-1]);
+          const avgGap = gaps.reduce((s,g) => s+g, 0) / gaps.length;
+          retardSW[n] = Math.max(1, ago / Math.max(1, avgGap));
+        }
+        const retardPB = {};
+        for (const d of historical) {
+          for (let a=0;a<d.balls.length;a++) for (let b=a+1;b<d.balls.length;b++) {
+            const k = d.balls[a]+','+d.balls[b];
+            retardPB[k] = (retardPB[k]||0)+1;
+          }
+        }
+
+        // Generate combos for each model
+        const retardCombos = generateCombosWithWeights(retardBW, retardSW, retardPB, histSet, COMBOS_PER_DRAW);
+        const randCombos   = generateCombosWithWeights(randomWeights(50), randomWeights(12), {}, histSet, COMBOS_PER_DRAW);
+        const freqCombos   = generateCombosWithWeights(
+          frequencyWeights(historical, 50, d => d.balls),
+          frequencyWeights(historical, 12, d => d.stars),
+          {}, histSet, COMBOS_PER_DRAW
+        );
+
+        // Count winners
+        const countWins = (combos) => combos.filter(c => hasPrize(
+          c.balls.filter(n => draw.balls.includes(n)).length,
+          c.stars.filter(s => draw.stars.includes(s)).length
+        )).length;
+
+        const retardWins = countWins(retardCombos);
+        const randWins   = countWins(randCombos);
+        const freqWins   = countWins(freqCombos);
+
+        results.retard.push(retardWins);
+        results.random.push(randWins);
+        results.freq.push(freqWins);
+
+        // Best match for retard
+        let bestMb = 0, bestMs = 0;
+        for (const c of retardCombos) {
+          const mb = c.balls.filter(n => draw.balls.includes(n)).length;
+          const ms = c.stars.filter(s => draw.stars.includes(s)).length;
+          if (mb > bestMb || (mb === bestMb && ms > bestMs)) { bestMb = mb; bestMs = ms; }
+        }
+        drawDetails.push({ draw, idx: i+1, retardWins, randWins, freqWins, bestMb, bestMs });
+
+        progText.textContent = `${i+1} / ${testCount}`;
+        progFill.style.width = ((i+1)/testCount*100) + '%';
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      displayBacktestResults(results, drawDetails, COMBOS_PER_DRAW, testCount);
+      btn.disabled = false;
+      progDiv.style.display = 'none';
+    }
+
+    function displayBacktestResults(results, drawDetails, combosPerDraw, testCount) {
+      const totalRetard = results.retard.reduce((s,x) => s+x, 0);
+      const totalRandom = results.random.reduce((s,x) => s+x, 0);
+      const totalFreq   = results.freq.reduce((s,x) => s+x, 0);
+
+      const drawsWithWin = results.retard.filter(x => x > 0).length;
+      const maxWinsInDraw = Math.max(...results.retard);
+
+      document.getElementById('bt-stats').innerHTML = `
+        <div class="bt-stat"><div class="val">${testCount}</div><div class="lbl">Tirages simulés</div></div>
+        <div class="bt-stat"><div class="val">${combosPerDraw}</div><div class="lbl">Combos / tirage</div></div>
+        <div class="bt-stat"><div class="val">${drawsWithWin}</div><div class="lbl">Tirages avec ≥1 gain (retard)</div></div>
+        <div class="bt-stat"><div class="val">${totalRetard}</div><div class="lbl">Total combos gagnantes (retard)</div></div>
+        <div class="bt-stat"><div class="val">${maxWinsInDraw}</div><div class="lbl">Max gagnantes en 1 tirage</div></div>
+        <div class="bt-stat"><div class="val">${(totalRetard/testCount).toFixed(2)}</div><div class="lbl">Moyenne gagnantes/tirage</div></div>
+      `;
+
+      const best = Math.max(totalRetard, totalRandom, totalFreq) || 1;
+      document.getElementById('bt-models').innerHTML = `
+        <div class="model-card">
+          <h4>🔄 Retard enrichi</h4>
+          <div class="score" style="color:#22c55e">${totalRetard}</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${totalRetard/best*100}%"></div></div>
+          <div style="font-size:0.75rem;color:#aaa">${(totalRetard/testCount).toFixed(2)} gains/tirage</div>
+        </div>
+        <div class="model-card">
+          <h4>🎲 Aléatoire pur</h4>
+          <div class="score" style="color:#f7971e">${totalRandom}</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${totalRandom/best*100}%"></div></div>
+          <div style="font-size:0.75rem;color:#aaa">${(totalRandom/testCount).toFixed(2)} gains/tirage</div>
+        </div>
+        <div class="model-card">
+          <h4>📈 Fréquence</h4>
+          <div class="score" style="color:#9c27b0">${totalFreq}</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${totalFreq/best*100}%"></div></div>
+          <div style="font-size:0.75rem;color:#aaa">${(totalFreq/testCount).toFixed(2)} gains/tirage</div>
+        </div>
+      `;
+
+      const tbody = document.getElementById('bt-rows');
+      tbody.innerHTML = drawDetails.map(r => {
+        const label = PRIZE_LABELS[r.bestMb+','+r.bestMs] || '—';
+        const hasWin = r.retardWins > 0;
+        const ballsStr = r.draw.balls.join(' - ');
+        const starsStr = r.draw.stars.join(' - ');
+        return `<tr class="${hasWin ? 'win' : ''}">
+          <td>${r.idx}</td>
+          <td>${ballsStr}</td>
+          <td>${starsStr}</td>
+          <td>${label} (${r.bestMb}B+${r.bestMs}E)</td>
+          <td>${r.retardWins} / ${r.randWins} / ${r.freqWins}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('bt-results').style.display = 'block';
+    }
+
     // ── Init ─────────────────────────────────────────────────────
     const btn = document.getElementById('genBtn');
     const status = document.getElementById('status');
@@ -335,6 +766,8 @@
       status.textContent = `${n} tirages chargés — mise à jour…`;
       btn.textContent = '🎲 Générer 100 combinaisons';
       btn.disabled = false;
+      document.getElementById('btBtn').textContent = '🚀 Lancer le backtest (100 tirages)';
+      document.getElementById('btBtn').disabled = false;
       document.getElementById('update-bar').style.display = 'block';
       await updateHistory();
       status.textContent = `${history.size} tirages chargés — prêt !`;
