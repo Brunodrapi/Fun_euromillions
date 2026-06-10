@@ -2,8 +2,8 @@ name: Rapport EuroMillions
 
 on:
   schedule:
-    - cron: '0 22 * * 3'   # Mercredi 22h UTC (apres tirage du mardi soir)
-    - cron: '0 22 * * 6'   # Samedi 22h UTC (apres tirage du vendredi soir)
+    - cron: '45 4 * * 3'   # Mercredi 4h45 UTC = 6h45 heure de Paris (ete) - apres tirage du mardi soir
+    - cron: '45 5 * * 6'   # Samedi 5h45 UTC = 7h45 heure de Paris (ete) - apres tirage du vendredi soir
   workflow_dispatch:        # Declenchement manuel possible
 
 jobs:
