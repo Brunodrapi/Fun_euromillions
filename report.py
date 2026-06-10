@@ -4,11 +4,13 @@ Rapport EuroMillions — exécuté chaque mercredi et samedi par GitHub Actions.
 2. Retire le dernier tirage pour ne pas biaiser les poids
 3. Génère 100 combinaisons basées sur les tendances actuelles
 4. Vérifie les gains contre le dernier tirage
-5. Envoie un email récapitulatif via Brevo
+5. Envoie un email récapitulatif via Gmail SMTP
 """
-import json, csv, random, time, os, urllib.request
+import json, csv, random, time, os, smtplib, urllib.request
 from pathlib import Path
 from datetime import date
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 API   = "https://euromillions.api.pedromealha.dev/v1/draws"
 CSV_F = Path(__file__).parent / "euromillions_history.csv"
@@ -168,10 +170,10 @@ def build_report(draw, combos):
 
 def combo_row(r):
     balls = " ".join(str(n) for n in r["balls"])
-    stars = " ".join(f"★{n}" for n in r["stars"])
+    stars = " ".join(f"*{n}" for n in r["stars"])
     col   = "#22c55e" if r["gain"] > 0 else "#9ca3af"
-    tag   = "⭐" if r.get("exclusive") else f"#{r['num']}"
-    gain  = f"{r['gain']:.2f} €" if r["gain"] else "—"
+    tag   = "[P]" if r.get("exclusive") else f"#{r['num']}"
+    gain  = f"{r['gain']:.2f} EUR" if r["gain"] else "-"
     return (f'<tr style="color:{col}">'
             f'<td style="padding:3px 8px">{tag}</td>'
             f'<td style="padding:3px 8px;font-family:monospace">{balls} | {stars}</td>'
@@ -180,46 +182,47 @@ def combo_row(r):
             f'<td style="padding:3px 8px;font-weight:bold">{gain}</td></tr>')
 
 def build_html(draw_date, db, ds, rows, g_top10, g_all):
-    db_str = " · ".join(f"<b>{n}</b>" for n in sorted(db))
-    ds_str = " · ".join(f"<b>★{n}</b>" for n in sorted(ds))
+    db_str = " - ".join(str(n) for n in sorted(db))
+    ds_str = " - ".join(str(n) for n in sorted(ds))
     winners = [r for r in rows if r["gain"] > 0]
     all_rows = "\n".join(combo_row(r) for r in rows)
     return f"""<html><body style="font-family:sans-serif;background:#1a1a2e;color:#fff;padding:24px">
-<h1 style="color:#ffd200">&#11088; Rapport EuroMillions &#8212; {draw_date}</h1>
-<p>Tirage&nbsp;: {db_str} &nbsp;|&nbsp; &#201;toiles&nbsp;: {ds_str}</p>
-<h2 style="color:#ffd200;margin-top:20px">R&#233;sum&#233;</h2>
+<h1 style="color:#ffd200">Rapport EuroMillions - {draw_date}</h1>
+<p>Tirage : {db_str} | Etoiles : {ds_str}</p>
+<h2 style="color:#ffd200;margin-top:20px">Resume</h2>
 <table>
-<tr><td style="padding:3px 16px 3px 0">Gagnantes sur 100 combinaisons&nbsp;:</td><td><b>{len(winners)}</b></td></tr>
-<tr><td>Gagnantes sur les 10 premi&#232;res &#11088;&nbsp;:</td><td><b>{len([r for r in winners if r.get('exclusive')])}</b></td></tr>
-<tr><td>Gain cumul&#233; &#8212; 10 premi&#232;res&nbsp;:</td><td><b style="color:#22c55e">{g_top10:.2f} &#8364;</b></td></tr>
-<tr><td>Gain cumul&#233; &#8212; 100 combinaisons&nbsp;:</td><td><b style="color:#22c55e">{g_all:.2f} &#8364;</b></td></tr>
+<tr><td style="padding:3px 16px 3px 0">Gagnantes sur 100 combinaisons :</td><td><b>{len(winners)}</b></td></tr>
+<tr><td>Gagnantes sur les 10 premieres [P] :</td><td><b>{len([r for r in winners if r.get('exclusive')])}</b></td></tr>
+<tr><td>Gain cumule - 10 premieres :</td><td><b style="color:#22c55e">{g_top10:.2f} EUR</b></td></tr>
+<tr><td>Gain cumule - 100 combinaisons :</td><td><b style="color:#22c55e">{g_all:.2f} EUR</b></td></tr>
 </table>
-<h2 style="color:#ffd200;margin-top:20px">D&#233;tail</h2>
+<h2 style="color:#ffd200;margin-top:20px">Detail</h2>
 <table style="font-size:13px;border-collapse:collapse">
 <thead><tr style="color:#ffd200;border-bottom:1px solid #444">
 <th style="padding:3px 8px">#</th><th>Combinaison</th><th>Match</th><th>Rang</th><th>Gain</th>
 </tr></thead><tbody>{all_rows}</tbody></table>
 <p style="color:#6b7280;font-size:11px;margin-top:20px">
-&#11088; = s&#233;lection premium (10 sans num&#233;ro commun) &#183; g&#233;n&#233;r&#233; automatiquement selon retard historique
+[P] = selection premium (10 sans numero commun) - genere automatiquement selon retard historique
 </p></body></html>"""
 
 def send_email(subject, html):
-    api_key   = os.environ["BREVO_API_KEY"]
-    mail_to   = os.environ["MAIL_TO"]
     mail_from = os.environ["MAIL_FROM"]
-    payload = json.dumps({
-        "sender":      {"email": mail_from},
-        "to":          [{"email": mail_to}],
-        "subject":     subject,
-        "htmlContent": html,
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
-        data=payload,
-        headers={"api-key": api_key, "Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=15) as r:
-        print(f"Email envoyé → {mail_to} (status {r.status})")
+    mail_to   = os.environ["MAIL_TO"]
+    password  = os.environ["MAIL_PASSWORD"]
+    smtp_host = os.environ.get("MAIL_SMTP", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("MAIL_PORT", "587"))
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = mail_from
+    msg["To"]      = mail_to
+    msg.attach(MIMEText(html, "html"))
+
+    with smtplib.SMTP(smtp_host, smtp_port) as s:
+        s.starttls()
+        s.login(mail_from, password)
+        s.sendmail(mail_from, mail_to, msg.as_string())
+    print(f"Email envoye -> {mail_to}")
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -227,7 +230,7 @@ if __name__ == "__main__":
     print("Chargement de l'historique...")
     draws = load_history()
 
-    print("Récupération du dernier tirage...")
+    print("Recuperation du dernier tirage...")
     last_draw = fetch_last_draw()
     print(f"  Tirage du {last_draw['date']} : {last_draw['numbers']} | {last_draw['stars']}")
 
@@ -235,16 +238,16 @@ if __name__ == "__main__":
     last_stars = tuple(sorted(int(x) for x in last_draw["stars"]))
     draws_without_last = [d for d in draws
                           if tuple(d["balls"]) != last_balls or tuple(d["stars"]) != last_stars]
-    print(f"  Historique pour génération : {len(draws_without_last)} tirages (dernier exclu)")
+    print(f"  Historique pour generation : {len(draws_without_last)} tirages (dernier exclu)")
 
-    print("Génération des 100 combinaisons...")
+    print("Generation des 100 combinaisons...")
     combos = generate_100(draws_without_last)
 
     print("Calcul des gains...")
     db, ds, rows, g_top10, g_all = build_report(last_draw, combos)
     winners = [r for r in rows if r["gain"] > 0]
-    print(f"  {len(winners)} gagnante(s) · top10={g_top10:.2f}€ · total={g_all:.2f}€")
+    print(f"  {len(winners)} gagnante(s) - top10={g_top10:.2f}EUR - total={g_all:.2f}EUR")
 
     html    = build_html(last_draw["date"], db, ds, rows, g_top10, g_all)
-    subject = f"EuroMillions {last_draw['date']} — {len(winners)} gagnante(s) · {g_all:.2f} €"
+    subject = f"EuroMillions {last_draw['date']} - {len(winners)} gagnante(s) - {g_all:.2f} EUR"
     send_email(subject, html)
